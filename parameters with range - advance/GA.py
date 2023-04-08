@@ -1,9 +1,11 @@
 import random
 import numpy as np
+import threading
+import concurrent.futures
 
 class GeneticAlgorithm:
     
-    def __init__(self, fitness_func, num_genes, gene_range, pop_size=50, mutation_rate=0.1, crossover_rate=0.9,extra_prop=None):
+    def __init__(self, fitness_func, num_genes, gene_range, pop_size=50, mutation_rate=0.1, crossover_rate=0.9, extra_prop=None, initial_values=None):
         """
         Initialize a new GeneticAlgorithm instance.
 
@@ -14,6 +16,8 @@ class GeneticAlgorithm:
             pop_size (int): The size of the population. Default is 50.
             mutation_rate (float): The probability of a gene mutation. Default is 0.1.
             crossover_rate (float): The probability of a crossover operation. Default is 0.9.
+            extra_prop (any): Extra properties to pass to the fitness function. Default is None.
+            initial_values (list): List of initial values for the genes in the first generation. Default is None (random initialization).
         """
         self.fitness_func = fitness_func
         self.num_genes = num_genes
@@ -21,8 +25,13 @@ class GeneticAlgorithm:
         self.pop_size = pop_size
         self.mutation_rate = mutation_rate
         self.crossover_rate = crossover_rate
-        self.population = self.initialize_population()
         self.extra_prop = extra_prop
+        
+        if initial_values is not None:
+            assert len(initial_values) == pop_size, "Initial values length should be equal to population size"
+            self.population = self.initialize_population(initial_values)
+        else:
+            self.population = self.initialize_population()
 
     
     def initialize_population(self,initial_values=None):
@@ -44,6 +53,17 @@ class GeneticAlgorithm:
             population.append(individual)
         return population
 
+    def evaluate_individual(self, individual):
+        """
+        Evaluate the fitness of an individual.
+
+        Args:
+            individual (list): The individual to evaluate.
+
+        Returns:
+            float: The fitness score of the individual.
+        """
+        return self.fitness_func(individual, self.extra_prop)
 
     def calculate_fitness(self, individual):
         """
@@ -57,18 +77,24 @@ class GeneticAlgorithm:
         """
         return self.fitness_func(individual,self.extra_prop)
 
-
     def evaluate_population(self):
         """
-        Evaluate the fitness of each individual in the current population.
+        Evaluate the fitness of each individual in the current population, using 4 threads.
 
         Returns:
             list: The fitness scores of the population.
         """
         fitness_scores = []
-        for individual in self.population:
-            fitness_score = self.calculate_fitness(individual)
-            fitness_scores.append(fitness_score)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            future_to_individual = {executor.submit(self.evaluate_individual, individual): individual for individual in self.population}
+            for future in concurrent.futures.as_completed(future_to_individual):
+                individual = future_to_individual[future]
+                try:
+                    fitness_score = future.result()
+                except Exception as exc:
+                    print(f"Exception occurred while evaluating individual {individual}: {exc}")
+                else:
+                    fitness_scores.append(fitness_score)
         return fitness_scores
 
 
@@ -280,5 +306,4 @@ class GeneticAlgorithm:
         
         # Return the best individual and its fitness score
         return best_individual, best_fitness_score
-
 

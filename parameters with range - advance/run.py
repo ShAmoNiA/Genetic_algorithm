@@ -1,6 +1,7 @@
 from GA import GeneticAlgorithm
 import yaml
 import numpy as np 
+import random
 
 meta = {
     'lr0': (1, 1e-5, 1e-1),  # initial learning rate (SGD=1E-2, Adam=1E-3)
@@ -37,7 +38,6 @@ meta = {
 
 
 def my_fitness_function(x,extra_prop):
-    print(extra_prop)
     return -x[0]**2 - x[1]**3 + x[2]**2
 
 with open("F:\project\Genetic_algorithm\parameters with range - advance\hyp.scratch-low.yaml", errors='ignore') as f:
@@ -51,8 +51,11 @@ for i in range(len(upper_limit)):
     gene_ranges.append((lower_limit[i],upper_limit[i]))
     
 
-print(hyp)
-# ga = GeneticAlgorithm(fitness_func=my_fitness_function, num_genes=3, gene_range=gene_ranges, pop_size=50, mutation_rate=mutation_rate, extra_prop = ["a","b"])
-# best_individual, best_fitness = ga.run(num_generations=500,initial_values=initial_values)
+ga = GeneticAlgorithm(fitness_func=my_fitness_function, num_genes=3, gene_range=gene_ranges, pop_size=50, mutation_rate=mutation_rate, extra_prop = ["a","b"])
+initial_values = [[random.uniform(*gene_ranges[j]) for j in range(3)] for i in range(50)]
+best_individual, best_fitness = ga.run(num_generations=500,initial_values=initial_values)
+
+
+
 # print(f"Best individual: {best_individual}")
 # print(f"Best fitness: {best_fitness}")
