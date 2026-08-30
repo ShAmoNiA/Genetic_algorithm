@@ -19,4 +19,5 @@ jobs:
       - run: python "parameters with range - advance/run.py" --seed 42 --generations 2
       - name: Installed module smoke test outside the checkout
         working-directory: ${{ runner.temp }}
-        run: python -c "from GA import GeneticAlgorithm; ga = GeneticAlgorithm(lambda x, e: sum(x), 1, [(0, 1)], seed=42); assert ga.run(0, verbose=False)[1] >= 0"
+        run: |
+          python -c "from GA import GeneticAlgorithm; ga = GeneticAlgorithm(lambda x, e: sum(x), 1, [(0, 1)], seed=42); assert ga.run(0, verbose=False)[1] >= 0"
