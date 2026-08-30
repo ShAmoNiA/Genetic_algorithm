@@ -1,7 +1,10 @@
+"""Portable configuration demo; the toy fitness does not train or assess YOLO."""
+
+import argparse
+import json
+from pathlib import Path
+
 from GA import GeneticAlgorithm
-import yaml
-import numpy as np 
-import random
 
 meta = {
     'lr0': (1, 1e-5, 1e-1),  # initial learning rate (SGD=1E-2, Adam=1E-3)
@@ -34,28 +37,48 @@ meta = {
     'mosaic': (1, 0.0, 1.0),  # image mixup (probability)
     'mixup': (1, 0.0, 1.0),  # image mixup (probability)
     'copy_paste': (1, 0.0, 1.0)}  # segment copy-paste (probability)
-        
 
 
-def my_fitness_function(x,extra_prop):
-    return -x[0]**2 - x[1]**3 + x[2]**2
-
-with open("F:\project\Genetic_algorithm\parameters with range - advance\hyp.scratch-low.yaml", errors='ignore') as f:
-    hyp = yaml.safe_load(f)
-mutation_rate = np.array([meta[k][0] for k in hyp.keys()])
-lower_limit = np.array([meta[k][1] for k in hyp.keys()])
-upper_limit = lower_limit = np.array([meta[k][2] for k in hyp.keys()])
-initial_values = list(hyp.values())
-gene_ranges = []
-for i in range(len(upper_limit)):
-    gene_ranges.append((lower_limit[i],upper_limit[i]))
-    
-
-ga = GeneticAlgorithm(fitness_func=my_fitness_function, num_genes=3, gene_range=gene_ranges, pop_size=50, mutation_rate=mutation_rate, extra_prop = ["a","b"])
-initial_values = [[random.uniform(*gene_ranges[j]) for j in range(3)] for i in range(50)]
-best_individual, best_fitness = ga.run(num_generations=500,initial_values=initial_values)
+def my_fitness_function(values, extra_prop):
+    """A toy bounded sum, useful for checking wiring only (larger is better)."""
+    return sum(values)
 
 
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--generations", type=int, default=50)
+    parser.add_argument("--population-size", type=int, default=50)
+    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--hyp", type=Path,
+                        default=Path(__file__).with_name("hyp.scratch-low.yaml"))
+    args = parser.parse_args(argv)
+    # Only this configuration example needs PyYAML; importing GA does not.
+    import yaml
 
-# print(f"Best individual: {best_individual}")
-# print(f"Best fitness: {best_fitness}")
+    with args.hyp.open(encoding="utf-8") as stream:
+        hyp = yaml.safe_load(stream)
+    if not isinstance(hyp, dict) or not hyp or set(hyp) - set(meta):
+        raise ValueError("hyp must be a nonempty mapping of known hyperparameter names")
+    names = list(hyp)
+    bounds = [(meta[name][1], meta[name][2]) for name in names]
+    # Metadata entries are mutation scales, not probabilities. In this toy
+    # example a base probability of 0.1 is multiplied by each scale.
+    rates = [0.1 * meta[name][0] for name in names]
+    ga = GeneticAlgorithm(
+        my_fitness_function, len(names), bounds, pop_size=args.population_size,
+        mutation_rate=rates, seed=args.seed, workers=args.workers,
+    )
+    initial_population = [row[:] for row in ga.population]
+    initial_population[0] = [hyp[name] for name in names]
+    best, score = ga.run(args.generations, initial_population, verbose=False)
+    print(json.dumps({
+        "objective": "toy_sum_not_yolo_training", "seed": args.seed,
+        "generations": args.generations, "population_size": args.population_size,
+        "workers": args.workers, "evaluations": ga.evaluations,
+        "best_fitness": score, "best_individual": dict(zip(names, best)),
+    }, indent=2))
+
+
+if __name__ == "__main__":
+    main()
